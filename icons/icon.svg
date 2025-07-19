@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!-- flat background -->
+  <rect width="512" height="512" rx="96" fill="#D9271E"/>
+  <!-- clipboard body -->
+  <rect x="136" y="132" width="240" height="300" rx="28" fill="#ffffff"/>
+  <!-- clip bar -->
+  <rect x="176" y="116" width="160" height="48" rx="12" fill="#ffffff"/>
+  <!-- letters ID -->
+  <path d="M206 338H186V262h20v76z" fill="#D9271E"/>
+  <path d="M310 300c0 26-16 40-40 40h-42v-76h42c24 0 40 14 40 36zm-21-1c0-12-8-19-22-19h-21v38h21c14 0 22-7 22-19z" fill="#D9271E"/>
+</svg>
+
