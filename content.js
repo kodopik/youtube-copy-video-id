@@ -27,14 +27,33 @@ function injectStandardLists() {
   const sel = [
     'ytd-video-renderer',
     'ytd-grid-video-renderer',
-    'ytd-rich-item-renderer'
+    'ytd-rich-item-renderer',
+    'ytd-reel-shelf-renderer'         // захват шортсов в карусели
   ].join(',');
   document.querySelectorAll(sel).forEach(item => {
     if (item.dataset.ytCopyInjected) return;
-    const link = item.querySelector('a[href*="watch?v="]');
+
+    // найдем ВСЕ подходящие ссылки внутри одного элемента
+    const link = item.querySelector(
+      'a[href*="watch?v="],' +
+      'a[href*="/shorts/"],' +
+      'a[href*="/live/"]'
+    );
     if (!link) return;
-    const vid = new URL(link.href).searchParams.get('v');
+
+    let vid = null;
+    const href = link.getAttribute('href');
+
+    if (href.includes('watch?v=')) {
+      vid = new URL(link.href).searchParams.get('v');
+    } else if (href.includes('/shorts/')) {
+      // /shorts/ID или /shorts/ID/...
+      vid = href.split('/shorts/')[1].split(/[?&/]/)[0];
+    } else if (href.includes('/live/')) {
+      vid = href.split('/live/')[1].split(/[?&/]/)[0];
+    }
     if (!vid) return;
+
     const meta = item.querySelector('#metadata-line, .view-count');
     addButton(meta, vid);
     item.dataset.ytCopyInjected = '1';
@@ -42,18 +61,34 @@ function injectStandardLists() {
   });
 }
 
-// 2) Single video page (watch?v=…) — кнопка внутри <h1> ytd-watch-metadata
+// 2) Single video page — now supports /watch, /shorts/ID and /live/ID
 function injectWatchPage() {
-  if (!location.pathname.startsWith('/watch')) return;
+  const p = location.pathname;
+  if (
+    !(p.startsWith('/watch') ||
+      p.startsWith('/shorts/') ||
+      p.startsWith('/live/'))
+  ) return;
 
-  const metaBlock = document.querySelector('ytd-watch-metadata');
+  // находим мета‑блок, в котором лежит <h1>
+  const metaBlock = document.querySelector('ytd-watch-metadata, ytd-rich-metadata-renderer');
   if (!metaBlock || metaBlock.dataset.ytWatchInjected) return;
+
+  // заголовок у всех трёх форм — первый <h1> внутри metaBlock
   const h1 = metaBlock.querySelector('h1');
   if (!h1) return;
 
-  const vid = new URL(location.href).searchParams.get('v');
+  // получение id
+  let vid = null;
+  if (p.startsWith('/watch')) {
+    vid = new URL(location.href).searchParams.get('v');
+  } else {
+    // /shorts/ID or /live/ID
+    vid = p.split('/')[2];
+  }
   if (!vid) return;
 
+  // вставляем четыре неразрывных пробела и кнопку
   h1.appendChild(document.createTextNode('\u00A0\u00A0\u00A0\u00A0'));
   h1.appendChild(createButton(vid));
 
@@ -67,6 +102,7 @@ function injectStudioRows() {
 
   document.querySelectorAll('ytcp-video-list-cell-video').forEach(row => {
     if (row.dataset.ytCopyInjected) return;
+
     const link = row.querySelector('a[href*="/video/"]');
     if (!link) return;
     const m = link.getAttribute('href').match(/\/video\/([^\/]+)/);
@@ -86,7 +122,7 @@ function injectStudioRows() {
   });
 }
 
-// helper: create 📋 button with enhanced click behavior
+// helper: create 📋 button
 function createButton(vid) {
   const btn = document.createElement('span');
   btn.textContent = '📋';
@@ -99,17 +135,13 @@ function createButton(vid) {
     padding: 0 4px;
     vertical-align: middle;
   `;
-
   btn.addEventListener('click', function(e) {
     e.preventDefault();
     e.stopPropagation();
     navigator.clipboard.writeText(vid)
-      .then(() => {
-        showToast(vid, this);
-      })
-      .catch(err => console.error('[YT‑CopyID] Clipboard error:', err));
+      .then(() => showToast(vid, this))
+      .catch(err => console.error('[YT‑CopyID] Clipboard error', err));
   });
-
   return btn;
 }
 
@@ -118,7 +150,7 @@ function addButton(container, vid) {
   if (container) container.appendChild(createButton(vid));
 }
 
-// toast: appears above the button, floats up ~20px while fading out over 600ms
+// toast: appears above the button, floats up and fades
 function showToast(text, anchor) {
   const toast = document.createElement('div');
   toast.textContent = text;
@@ -139,31 +171,24 @@ function showToast(text, anchor) {
   `;
   document.body.appendChild(toast);
 
-  let positioned = false;
   try {
     const rect = anchor.getBoundingClientRect();
-    const startY = window.scrollY + rect.top - 8; // baseline just above button
+    const startY = window.scrollY + rect.top - 8;
     const startX = window.scrollX + rect.left + rect.width / 2;
     toast.style.top = `${startY}px`;
     toast.style.left = `${startX}px`;
-    // force layout to apply initial styles before animating
     void toast.offsetWidth;
-    // animate: move up ~20px (≈1 cm on 1080p) and fade out
     toast.style.opacity = '1';
     toast.style.transform = 'translate(-50%, -20px)';
-    positioned = true;
   } catch {
-    // fallback: bottom center fixed
     toast.style.position = 'fixed';
-    toast.style.bottom = '40px';
-    toast.style.left = '50%';
-    toast.style.transform = 'translate(-50%, 0)';
+    toast.style.bottom   = '40px';
+    toast.style.left     = '50%';
+    toast.style.transform= 'translate(-50%, -20px)';
     void toast.offsetWidth;
     toast.style.opacity = '1';
-    toast.style.transform = 'translate(-50%, -20px)';
   }
 
-  // remove after transition (~600ms)
   setTimeout(() => {
     if (toast.parentNode) toast.parentNode.removeChild(toast);
   }, 650);
